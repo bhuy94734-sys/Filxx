@@ -4,6 +4,7 @@ import os
 import random
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F, types
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -15,7 +16,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "8985238179"))
 GROUP_CHAT_ID = int(os.getenv("GROUP_CHAT_ID", "-100123456789"))
 
 logging.basicConfig(level=logging.INFO)
-bot = Bot(token=TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
@@ -56,35 +57,46 @@ async def run_game_loop():
   await asyncio.sleep(5)
   while True:
     if game_running:
-      d1 = random.randint(1, 6)
-      d2 = random.randint(1, 6)
-      d3 = random.randint(1, 6)
-      total = d1 + d2 + d3
+      try:
+        # Gửi hoạt ảnh xúc xắc động chính hãng của Telegram vào nhóm
+        dice_msg_1 = await bot.send_dice(chat_id=GROUP_CHAT_ID, emoji="🎲")
+        d1 = dice_msg_1.dice.value
+        await asyncio.sleep(1)
 
-      if total <= 10:
-        tx_result = "Xỉu"
-        tx_code = "X"
-      else:
-        tx_result = "Tài"
-        tx_code = "T"
+        dice_msg_2 = await bot.send_dice(chat_id=GROUP_CHAT_ID, emoji="🎲")
+        d2 = dice_msg_2.dice.value
+        await asyncio.sleep(1)
 
-      cl_result = "Chẵn" if total % 2 == 0 else "Lẻ"
-      cl_code = "C" if total % 2 == 0 else "L"
+        dice_msg_3 = await bot.send_dice(chat_id=GROUP_CHAT_ID, emoji="🎲")
+        d3 = dice_msg_3.dice.value
+        await asyncio.sleep(2)
 
-      recent_tai_xiu.append(tx_code)
-      if len(recent_tai_xiu) > 12:
-        recent_tai_xiu.pop(0)
+        total = d1 + d2 + d3
 
-      recent_chan_le.append(cl_code)
-      if len(recent_chan_le) > 12:
-        recent_chan_le.pop(0)
+        if total <= 10:
+          tx_result = "Xỉu"
+          tx_code = "X"
+        else:
+          tx_result = "Tài"
+          tx_code = "T"
 
-      tong_thang = random.randint(500000, 3000000)
-      tong_thua = random.randint(500000, 3000000)
-      cong_hu = tong_thua * 0.005
-      current_jackpot += cong_hu
+        cl_result = "Chẵn" if total % 2 == 0 else "Lẻ"
+        cl_code = "C" if total % 2 == 0 else "L"
 
-      text = f"""KẾT QUẢ XX PHIÊN (#{current_session})
+        recent_tai_xiu.append(tx_code)
+        if len(recent_tai_xiu) > 12:
+          recent_tai_xiu.pop(0)
+
+        recent_chan_le.append(cl_code)
+        if len(recent_chan_le) > 12:
+          recent_chan_le.pop(0)
+
+        tong_thang = random.randint(500000, 3000000)
+        tong_thua = random.randint(500000, 3000000)
+        cong_hu = tong_thua * 0.005
+        current_jackpot += cong_hu
+
+        text = f"""KẾT QUẢ XX PHIÊN (#{current_session})
 
 _____________________
 |   {get_dice_emoji(d1)} {get_dice_emoji(d2)} {get_dice_emoji(d3)} ➡️ {total} điểm → {tx_result} | {cl_result}
@@ -99,14 +111,14 @@ _____________________
 
 {build_statistics_string()}"""
 
-      try:
         await bot.send_message(
             chat_id=GROUP_CHAT_ID, text=text, reply_markup=build_main_keyboard()
         )
-      except Exception as e:
-        logging.error(f"Lỗi gửi kết quả game: {e}")
 
-      current_session += 1
+        current_session += 1
+      except Exception as e:
+        logging.error(f"Lỗi vòng lặp game xúc xắc: {e}")
+
     await asyncio.sleep(30)
 
 
@@ -237,7 +249,6 @@ async def process_deposit_amount(callback: types.CallbackQuery):
   username = callback.from_user.username or callback.from_user.full_name
   random_content = f"NAP{user_id}{random.randint(100, 999)}"
 
-  # Lưu hoặc cập nhật người chơi tạm thời vào danh sách người chơi
   if user_id not in players_in_session:
     players_in_session[user_id] = {"balance": 0.0, "username": username}
 
@@ -297,7 +308,6 @@ async def admin_handle_deposit(callback: types.CallbackQuery):
   amount = float(parts[2])
 
   if action == "approve":
-    # Cộng dồn tiền vào số dư của khách
     if user_id in players_in_session:
       players_in_session[user_id]["balance"] += amount
     else:
