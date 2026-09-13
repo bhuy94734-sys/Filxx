@@ -1,0 +1,95 @@
+import sqlite3
+
+class Database:
+    def __init__(self, db_file="bot_game.db"):
+        self.db_file = db_file
+        self.create_table()
+
+    def get_connection(self):
+        return sqlite3.connect(self.db_file)
+
+    def create_table(self):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                username TEXT,
+                balance REAL DEFAULT 0.0,
+                total_bet REAL DEFAULT 0.0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS giftcodes (
+                code TEXT PRIMARY KEY,
+                amount REAL,
+                used INTEGER DEFAULT 0
+            )
+        ''')
+        conn.commit()
+        conn.close()
+
+    def get_user(self, user_id, username=""):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id, username, balance, total_bet FROM users WHERE user_id = ?", (user_id,))
+        user = cursor.fetchone()
+        
+        if not user:
+            cursor.execute("INSERT INTO users (user_id, username, balance) VALUES (?, ?, ?)", (user_id, username, 0.0))
+            conn.commit()
+            user = (user_id, username, 0.0, 0.0)
+            
+        conn.close()
+        return {"user_id": user[0], "username": user[1], "balance": user[2], "total_bet": user[3]}
+
+    def update_balance(self, user_id, amount):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, user_id))
+        conn.commit()
+        conn.close()
+
+    def get_all_users(self):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id FROM users")
+        users = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        return users
+
+    def create_giftcode(self, code, amount):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute("INSERT INTO giftcodes (code, amount, used) VALUES (?, ?, 0)", (code, amount))
+            conn.commit()
+            success = True
+        except sqlite3.IntegrityError:
+            success = False
+        conn.close()
+        return success
+
+    def use_giftcode(self, user_id, code):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT amount, used FROM giftcodes WHERE code = ?", (code,))
+        row = cursor.fetchone()
+        
+        if not row:
+            conn.close()
+            return "not_found"
+        
+        amount, used = row
+        if used == 1:
+            conn.close()
+            return "used"
+
+        cursor.execute("UPDATE giftcodes SET used = 1 WHERE code = ?", (code,))
+        cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, user_id))
+        conn.commit()
+        conn.close()
+        return amount
+
+db = Database()
