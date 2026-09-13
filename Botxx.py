@@ -340,7 +340,7 @@ async def admin_handle_deposit(callback: types.CallbackQuery):
   await callback.answer("Đã xử lý.")
 
 
-# Web server giả lập duy trì UptimeRobot
+# Web server giả lập duy trì UptimeRobot (Đã sửa lỗi cổng 10000)
 async def handle_ping(request):
   return web.Response(text="Bot is running with Admin commands!")
 
@@ -350,7 +350,7 @@ async def start_web_server():
   app.router.add_get("/", handle_ping)
   runner = web.AppRunner(app)
   await runner.setup()
-  port = int(os.getenv("PORT", 8080))
+  port = int(os.environ.get("PORT", 10000))
   site = web.TCPSite(runner, "0.0.0.0", port)
   await site.start()
 
