@@ -3,3 +3,4 @@ aiohttp
 pydantic>=2.7.0
 pydantic-core>=2.18.0
 flask
+python-telegram-bot
